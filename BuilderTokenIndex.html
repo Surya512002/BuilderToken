@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Token Faucet</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; background: #0052FF; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .container { background: white; color: black; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 400px; width: 90%; }
+        h1 { margin-top: 0; color: #0052FF; }
+        button { background: #0052FF; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.1rem; cursor: pointer; margin: 10px 0; transition: transform 0.1s; width: 100%; font-weight: bold; }
+        button:hover { transform: scale(1.02); background: #0040c9; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #status { margin-top: 15px; font-size: 0.9rem; color: #666; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚀 Builder Token</h1>
+        <p>Claim your free 1,000 BBC Tokens on Base!</p>
+        
+        <button id="connectBtn">Connect Wallet</button>
+        
+        <div id="actionArea" class="hidden">
+            <p>Wallet: <span id="walletAddress" style="color:#0052FF; font-weight:bold;">...</span></p>
+            <button id="mintBtn">Mint 1,000 Tokens 💰</button>
+            <button id="addTokenBtn" style="background: #28a745; display:none;">Add to MetaMask 🦊</button>
+        </div>
+
+        <p id="status"></p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+
+    <script>
+        // --- CONFIGURATION ---
+        // 1. PASTE YOUR CONTRACT ADDRESS HERE:
+        const CONTRACT_ADDRESS = "0x7Fd5a48F5ACF758b4A6f83B7009A9FF42585469E"; 
+        
+        // 2. Minimal ABI (Tells the frontend how to talk to the contract)
+        const ABI = [
+            "function mintFreeTokens() public",
+            "function symbol() view returns (string)",
+            "function decimals() view returns (uint8)"
+        ];
+
+        // --- APP LOGIC ---
+        let provider, signer, contract;
+
+        const connectBtn = document.getElementById("connectBtn");
+        const mintBtn = document.getElementById("mintBtn");
+        const actionArea = document.getElementById("actionArea");
+        const statusMsg = document.getElementById("status");
+        const walletSpan = document.getElementById("walletAddress");
+        const addTokenBtn = document.getElementById("addTokenBtn");
+
+        connectBtn.addEventListener("click", async () => {
+            if (window.ethereum) {
+                try {
+                    // Connect to wallet
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await provider.send("eth_requestAccounts", []);
+                    signer = provider.getSigner();
+                    const address = await signer.getAddress();
+
+                    // Update UI
+                    walletSpan.innerText = address.substring(0, 6) + "..." + address.substring(38);
+                    connectBtn.classList.add("hidden");
+                    actionArea.classList.remove("hidden");
+                    statusMsg.innerText = "Wallet Connected!";
+
+                    // Setup Contract
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+                } catch (err) {
+                    statusMsg.innerText = "Error: " + err.message;
+                }
+            } else {
+                alert("Please install MetaMask!");
+            }
+        });
+
+        mintBtn.addEventListener("click", async () => {
+            if(!contract) return;
+            try {
+                statusMsg.innerText = "Waiting for approval in wallet...";
+                mintBtn.disabled = true;
+                mintBtn.innerText = "Minting...";
+
+                const tx = await contract.mintFreeTokens();
+                statusMsg.innerText = "Transaction sent! Waiting for confirmation...";
+                
+                await tx.wait(); // Wait for block confirmation
+                
+                statusMsg.innerText = "Success! You got 1,000 Tokens! 🎉";
+                mintBtn.innerText = "Minted!";
+                addTokenBtn.style.display = "block"; // Show the "Add to Wallet" button
+                
+            } catch (err) {
+                console.error(err);
+                statusMsg.innerText = "Error: Did you already claim?";
+                mintBtn.disabled = false;
+                mintBtn.innerText = "Mint 1,000 Tokens 💰";
+            }
+        });
+
+        addTokenBtn.addEventListener("click", async () => {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_watchAsset',
+                    params: {
+                        type: 'ERC20',
+                        options: {
+                            address: CONTRACT_ADDRESS,
+                            symbol: 'BBC',
+                            decimals: 18,
+                        },
+                    },
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>
